@@ -1,87 +1,95 @@
-from datetime import datetime
+import json
 import requests
-import telebot
-from telebot import types
+from settings import settings
+from telegram import ReplyKeyboardMarkup, KeyboardButton
+from telegram.ext import Updater, CommandHandler
+from telegram.utils.request import Request
 
-# Bot tokeningiz
-BOT_TOKEN = '8820173603:AAFPAN7SFxa2cXX1el2aHJWmv_q_RAJI4fI'
-bot = telebot.TeleBot(BOT_TOKEN)
-
-# Foydalanuvchi ma'lumotlarini vaqtincha saqlash uchun lug'at
-user_data = {}
-
-# Markaziy bankdan ma'lumot olish
-def get_currency_data():
-    url = "https://cbu.uz/uz/arkhiv-kursov-valyut/json/"
-    response = requests.get(url)
-    return response.json()
-
-# Kursni aniqlash
-def get_currency_rate(currency_code):
-    data = get_currency_data()
-    for item in data:
-        if item['Ccy'] == currency_code:
-            return float(item['Rate'])
-    return None
-
-# /start buyrug'i berilganda tugmalarni ko'rsatish
-@bot.message_handler(commands=['start'])
-def start_command(message):
-    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
-    markup.add('USD', 'EUR', 'RUB')
+def valyuta_kursini_ol(valyuta_kodi):
+    url = f"https://cbu.uz{valyuta_kodi}/"
     
-    msg = bot.send_message(
-        message.chat.id, 
-        "Salom! Valyuta ayboshlash botiga xush kelibsiz.\nQaysi valyutani tanlaysiz?", 
-        reply_markup=markup
+    response = requests.get(url, timeout=5)
+    data = response.json()
+    
+    kurs_info = data[0] if isinstance(data, list) else data
+    return kurs_info
+
+def send_welcome(update, context):
+    keyboard = [
+        [
+            KeyboardButton(text="Bosh Sahifa"),
+            KeyboardButton(text="Mahsulotlar"),
+            KeyboardButton(text="Valyuta Kursi")
+        ]
+    ]
+    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    
+    matn = (
+        "👋 Welcome!\n\n"
+        "I am a bot that shows the latest exchange rates of the Central Bank.\n"
+        "Send the /kurs command to see the exchange rates."
     )
-    # Keyingi qadamga o'tish (valyutani tekshirish)
-    bot.register_next_step_handler(msg, process_currency_step)
+    update.message.reply_text(text=matn, reply_markup=reply_markup)
 
-# Valyuta tanlangandan keyingi qadam
-def process_currency_step(message):
-    currency = message.text.upper()
-    if currency in ['USD', 'EUR', 'RUB']:
-        user_data[message.chat.id] = {'currency': currency}
-        msg = bot.send_message(
-            message.chat.id, 
-            f"Qiymatni kiriting (Masalan: 100):",
-            reply_markup=types.ReplyKeyboardRemove() # Tugmalarni yopish
-        )
-        # Keyingi qadamga o'tish (summani hisoblash)
-        bot.register_next_step_handler(msg, process_amount_step)
-    else:
-        msg = bot.send_message(message.chat.id, "Iltimos, faqat tugmalardan birini tanlang (USD, EUR, RUB):")
-        bot.register_next_step_handler(msg, process_currency_step)
 
-# Summa kiritilgandan keyingi qadam va hisoblash
-def process_amount_step(message):
-    try:
-        amount = float(message.text)
-        chat_id = message.chat.id
-        currency_code = user_data[chat_id]['currency']
-        
-        rate = get_currency_rate(currency_code)
-        
-        if rate is not None:
-            converted_amount = amount * rate
-            text = (
-                f"📊 **Natija:**\n\n"
-                f"{amount:,.2f} {currency_code} = {converted_amount:,.2f} UZS\n"
-                f"Kurs: 1 {currency_code} = {rate:,.2f} UZS"
-            )
-            bot.send_message(chat_id, text, parse_mode="Markdown")
-        else:
-            bot.send_message(chat_id, "Xatolik: Valyuta kursi topilmadi.")
+def send_rates(update, context):
+    context.bot.send_chat_action(chat_id=update.effective_chat.id, action='typing')
+    
+    valyutalar = ['USD', 'EUR', 'RUB']
+    javob_matni = "💰 **Central Bank Exchange Rates:**\n\n"
+    sana = ""
+    
+    for kod in valyutalar:
+        info = valyuta_kursini_ol(kod)
+        javob_matni += f"🔹 1 **{info['Ccy']}** = {info['Rate']} UZS ({info['CcyNm_EN']})\n"
+        sana = info['Date']
             
-        # Qayta boshlash imkoniyati
-        start_command(message)
-        
-    except ValueError:
-        msg = bot.send_message(message.chat.id, "Iltimos, faqat son kiriting (Masalan: 50 yoki 12.5):")
-        bot.register_next_step_handler(msg, process_amount_step)
+    javob_matni += f"\n📅 *Date:* {sana}"
+    update.message.reply_text(javob_matni, parse_mode='Markdown')
 
-# Botni ishga tushirish
-if __name__ == '__main__':
-    print("Bot ishga tushdi...")
-    bot.infinity_polling()
+def main():
+    updater = Updater(token=settings.TOKEN, use_context=True)
+    dispatcher = updater.dispatcher
+
+    dispatcher.add_handler(CommandHandler(['start', 'help'], send_welcome))
+    dispatcher.add_handler(CommandHandler('kurs', send_rates))
+
+    print("Bot is running...")
+    updater.start_polling()
+    updater.idle()
+
+def save_user(update):
+    if not update.message or not update.message.from_user:
+        return
+        
+    user_id = update.message.from_user.id
+    username = update.message.from_user.username
+    first_name = update.message.from_user.first_name
+
+    file = open("users.json", "r", encoding="utf-8")
+    users = json.load(file)
+    file.close()
+
+    exists = False
+    for u in users:
+        if u["user_id"] == user_id:
+            exists = True
+
+    if not exists:
+        new_user = {
+            "user_id": user_id,
+            "username": username,
+            "first_name": first_name
+        }
+        users.append(new_user)
+        
+        file = open("users.json", "w", encoding="utf-8")
+        json.dump(users, file, indent=4, ensure_ascii=False)
+        file.close()
+
+def start_funksiyasi(message):
+    
+    save_user(message.from_user.id, message.from_user.username, message.from_user.first_name)
+
+if __name__ == "__main__":
+    main()
