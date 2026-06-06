@@ -25,7 +25,7 @@ def send_welcome(update, context):
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     
     matn = (
-        "👋 Welcome!\n\n"
+        " Welcome!\n\n"
         "I am a bot that shows the latest exchange rates of the Central Bank.\n"
         "Send the /kurs command to see the exchange rates."
     )
@@ -36,7 +36,7 @@ def send_rates(update, context):
     context.bot.send_chat_action(chat_id=update.effective_chat.id, action='typing')
     
     valyutalar = ['USD', 'EUR', 'RUB']
-    javob_matni = "💰 **Central Bank Exchange Rates:**\n\n"
+    javob_matni = "**Central Bank Exchange Rates:**\n\n"
     sana = ""
     
     for kod in valyutalar:
@@ -44,7 +44,7 @@ def send_rates(update, context):
         javob_matni += f"🔹 1 **{info['Ccy']}** = {info['Rate']} UZS ({info['CcyNm_EN']})\n"
         sana = info['Date']
             
-    javob_matni += f"\n📅 *Date:* {sana}"
+    javob_matni += f"\n *Date:* {sana}"
     update.message.reply_text(javob_matni, parse_mode='Markdown')
 
 def main():
