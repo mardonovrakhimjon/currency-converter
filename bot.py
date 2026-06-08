@@ -42,7 +42,7 @@ def start(update, context):
     user = update.message.from_user
     save_user(user.id, user.full_name)
     
-    buttons = [[KeyboardButton("📈 Valyuta kursi")]]
+    buttons = [[KeyboardButton("Valyuta kursi")]]
     update.message.reply_text(
         f"Salom, {user.full_name}! Botga xush kelibsiz.",
         reply_markup=ReplyKeyboardMarkup(buttons, resize_keyboard=True)
@@ -51,7 +51,7 @@ def start(update, context):
 def handle_message(update, context):
     text = update.message.text
     
-    if text == "📈 Valyuta kursi":
+    if text == "Valyuta kursi":
         buttons = [[KeyboardButton("USD 🇺🇸"), KeyboardButton("EUR 🇪🇺"), KeyboardButton("RUB 🇷🇺")]]
         update.message.reply_text("Qaysi valyutani so'mga o'girmoqchisiz?", reply_markup=ReplyKeyboardMarkup(buttons, resize_keyboard=True))
         return
@@ -79,10 +79,10 @@ def handle_message(update, context):
             
             if rate is not None:
                 result = amount * rate
-                buttons = [[KeyboardButton("📈 Valyuta kursi")]]
+                buttons = [[KeyboardButton("Valyuta kursi")]]
                 update.message.reply_text(
-                    f"📊 Natija: {amount:,.2f} {currency} = {result:,.2f} so'm\n"
-                    f"📈 Kurs: 1 {currency} = {rate} so'm",
+                    f"Natija: {amount:,.2f} {currency} = {result:,.2f} so'm\n"
+                    f"Kurs: 1 {currency} = {rate} so'm",
                     reply_markup=ReplyKeyboardMarkup(buttons, resize_keyboard=True)
                 )
             else:
